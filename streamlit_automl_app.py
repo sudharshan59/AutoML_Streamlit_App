@@ -9,122 +9,113 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
-# === App Layout ===
-st.set_page_config(page_title='🧠 AutoML Interface', layout='wide')
-st.title("🔍 Smart AutoML Interface")
+st.set_page_config(page_title='🧠 AutoML System', layout='wide')
+st.title("🤖 AutoML Web App (ML + DL + CV)")
 
-# === Step 1: Select AI Category ===
-category = st.selectbox("📂 Select AI Category", ["-- Select --", "ML (Machine Learning)", "DL (Deep Learning)", "CV (Computer Vision)"])
+# === Step 1: Select Category ===
+category = st.radio("📂 Choose AI Category", ["ML", "DL", "CV"])
 
-# === Step 2: Show Relevant Algorithms ===
-algo_options = []
-
-if category == "ML (Machine Learning)":
-    algo_options = ["KMeans (Clustering)", "Random Forest", "Logistic Regression"]
-elif category == "DL (Deep Learning)":
-    algo_options = ["Simple Neural Network (CSV)"]
-elif category == "CV (Computer Vision)":
-    algo_options = ["Image Classification (CNN)"]
-
-algorithm = st.selectbox("🤖 Select Algorithm", ["-- Select --"] + algo_options)
-
-# === Step 3: Upload Dataset ===
-st.subheader("📁 Upload Your Dataset")
-
-if category == "CV (Computer Vision)":
-    uploaded_file = st.file_uploader("Upload a ZIP of image folder (CV only)", type=["zip"])
+# === Step 2: Upload Dataset ===
+if category == "CV":
+    uploaded = st.file_uploader("Upload a ZIP of images (CV only)", type=["zip"])
 else:
-    uploaded_file = st.file_uploader("Upload a CSV file (ML/DL)", type=["csv"])
+    uploaded = st.file_uploader("Upload a CSV dataset (ML/DL)", type=["csv"])
 
-# === Step 4: Validate + Run ===
-if uploaded_file is not None and algorithm != "-- Select --":
+# === Step 3: Handle Dataset
+if uploaded:
+    if category == "CV" and not uploaded.name.endswith(".zip"):
+        st.error("❌ Please upload a valid .ZIP file for CV models.")
+    elif category in ["ML", "DL"] and not uploaded.name.endswith(".csv"):
+        st.error("❌ Please upload a valid .CSV file for ML/DL models.")
+    else:
+        if category in ["ML", "DL"]:
+            df = pd.read_csv(uploaded)
+            st.subheader("📊 Dataset Preview")
+            st.dataframe(df.head())
 
-    # ❌ File Type Check
-    if category == "CV (Computer Vision)" and not uploaded_file.name.endswith(".zip"):
-        st.error("❌ This algorithm requires an image ZIP dataset. Please upload a valid image ZIP.")
-    elif category in ["ML (Machine Learning)", "DL (Deep Learning)"] and not uploaded_file.name.endswith(".csv"):
-        st.error("❌ This algorithm requires a CSV dataset. Please upload a valid .csv file.")
+            X = df.select_dtypes(include=np.number)
+            y = df['target'] if 'target' in df.columns else None
 
-    # === CSV Processing ===
-    elif uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
-        st.subheader("📄 Dataset Preview")
-        st.dataframe(df.head())
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
 
-        X = df.select_dtypes(include=np.number)
-        y = df['target'] if 'target' in df.columns else None
+            if st.button("🚀 Run All Models"):
+                st.success(f"Running all models in {category}...")
 
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+                # ==== ML MODELS ====
+                if category == "ML":
+                    st.subheader("🧠 ML: KMeans (Clustering)")
+                    kmeans = KMeans(n_clusters=3)
+                    labels = kmeans.fit_predict(X_scaled)
+                    fig, ax = plt.subplots()
+                    ax.scatter(X_scaled[:, 0], X_scaled[:, 1], c=labels, cmap='Set2')
+                    ax.set_title("KMeans Clusters")
+                    st.pyplot(fig)
 
-        if st.button("🚀 Run Model"):
-            st.subheader("📊 Result")
+                    if y is not None:
+                        # Random Forest
+                        st.subheader("🌲 Random Forest")
+                        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2)
+                        rf = RandomForestClassifier()
+                        rf.fit(X_train, y_train)
+                        y_pred = rf.predict(X_test)
+                        st.text("Confusion Matrix:")
+                        st.text(confusion_matrix(y_test, y_pred))
+                        st.text("Classification Report:")
+                        st.text(classification_report(y_test, y_pred))
 
-            if algorithm == "KMeans (Clustering)":
-                k = st.slider("Choose number of clusters", 2, 10, 3)
-                model = KMeans(n_clusters=k)
-                labels = model.fit_predict(X_scaled)
-                df['Cluster'] = labels
-                fig, ax = plt.subplots()
-                ax.scatter(X_scaled[:, 0], X_scaled[:, 1], c=labels, cmap='Set2')
-                ax.set_title("KMeans Clusters")
-                st.pyplot(fig)
+                        # Logistic Regression
+                        st.subheader("📈 Logistic Regression")
+                        model = LogisticRegression()
+                        model.fit(X_train, y_train)
+                        y_pred = model.predict(X_test)
+                        st.text("Confusion Matrix:")
+                        st.text(confusion_matrix(y_test, y_pred))
+                        st.text("Classification Report:")
+                        st.text(classification_report(y_test, y_pred))
+                    else:
+                        st.warning("⚠️ 'target' column not found. Classification models skipped.")
 
-            elif algorithm == "Random Forest":
-                if y is not None:
-                    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2)
-                    model = RandomForestClassifier()
-                    model.fit(X_train, y_train)
-                    y_pred = model.predict(X_test)
-                    st.text("Confusion Matrix:")
-                    st.text(confusion_matrix(y_test, y_pred))
-                    st.text("Classification Report:")
-                    st.text(classification_report(y_test, y_pred))
-                else:
-                    st.warning("Please add a 'target' column to use this algorithm.")
+                # ==== DL MODELS ====
+                elif category == "DL":
+                    if y is not None:
+                        st.subheader("🔮 Simple Neural Network")
+                        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2)
+                        model = tf.keras.Sequential([
+                            tf.keras.layers.Dense(64, activation='relu'),
+                            tf.keras.layers.Dense(32, activation='relu'),
+                            tf.keras.layers.Dense(1, activation='sigmoid')
+                        ])
+                        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+                        model.fit(X_train, y_train, epochs=10, verbose=0)
+                        loss, acc = model.evaluate(X_test, y_test)
+                        st.success(f"✅ Neural Network Accuracy: {acc:.2%}")
+                    else:
+                        st.warning("⚠️ 'target' column not found. Neural network training skipped.")
 
-            elif algorithm == "Logistic Regression":
-                if y is not None:
-                    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2)
-                    model = LogisticRegression()
-                    model.fit(X_train, y_train)
-                    y_pred = model.predict(X_test)
-                    st.text("Confusion Matrix:")
-                    st.text(confusion_matrix(y_test, y_pred))
-                    st.text("Classification Report:")
-                    st.text(classification_report(y_test, y_pred))
-                else:
-                    st.warning("Please add a 'target' column to use this algorithm.")
+        # ==== CV PLACEHOLDER ====
+        elif category == "CV":
+            st.warning("📦 CV model support coming soon (CNN on image ZIP).")
 
-            elif algorithm == "Simple Neural Network (CSV)":
-                st.warning("⚠️ DL model support coming soon! Currently under development.")
-
-    # === Image ZIP for CV ===
-    elif uploaded_file.name.endswith(".zip") and category == "CV (Computer Vision)":
-        st.warning("⚠️ CV image model support (CNN) is coming soon! Not yet implemented.")
-
-# === Step 5: AI Assistant ===
+# === Step 4: Built-in AI Assistant ===
 st.markdown("---")
-st.subheader("💡 Need Help? Ask the AutoML Assistant")
+st.subheader("💬 Ask the AutoML Assistant")
 
-user_query = st.text_input("🧠 Ask a question about models, dataset, or errors...")
+query = st.text_input("🧠 Ask about dataset, models, or errors...")
 
-if user_query:
-    with st.spinner("Thinking..."):
-        # Simple AI logic (rule-based)
-        query = user_query.lower()
-        if "target" in query:
-            reply = "A 'target' column is needed for classification models like Random Forest and Logistic Regression."
-        elif "kmeans" in query:
-            reply = "KMeans is unsupervised and doesn't require a target column."
-        elif "csv" in query:
-            reply = "For ML/DL, use a .CSV file with numeric features and optionally a 'target' column."
-        elif "zip" in query or "image" in query:
-            reply = "For CV models, upload a ZIP file of images arranged by folders (one folder per class)."
-        elif "clusters" in query:
-            reply = "Start with 3–5 clusters. You can adjust based on elbow method or visual separation."
-        else:
-            reply = "I'm here to help! Try asking about model types, data formats, or errors."
+if query:
+    query = query.lower()
+    if "target" in query:
+        answer = "A 'target' column is required for classification models like Random Forest or DL."
+    elif "kmeans" in query:
+        answer = "KMeans is unsupervised and does not need a target column."
+    elif "csv" in query:
+        answer = "CSV files are used for ML and DL models. Make sure features are numeric."
+    elif "zip" in query or "image" in query:
+        answer = "ZIP files should contain images organized in folders by class (for CV models)."
+    else:
+        answer = "Try asking about model types, dataset formats, or error messages."
 
-        st.success(reply)
+    st.info(f"💡 {answer}")
