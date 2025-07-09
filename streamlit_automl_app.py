@@ -10,6 +10,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 
+# === App Layout ===
 st.set_page_config(page_title='🧠 AutoML Interface', layout='wide')
 st.title("🔍 Smart AutoML Interface")
 
@@ -39,13 +40,13 @@ else:
 # === Step 4: Validate + Run ===
 if uploaded_file is not None and algorithm != "-- Select --":
 
-    # Error if wrong file type
+    # ❌ File Type Check
     if category == "CV (Computer Vision)" and not uploaded_file.name.endswith(".zip"):
-        st.error("❌ This algorithm requires image ZIP dataset. Please upload a valid image zip file.")
+        st.error("❌ This algorithm requires an image ZIP dataset. Please upload a valid image ZIP.")
     elif category in ["ML (Machine Learning)", "DL (Deep Learning)"] and not uploaded_file.name.endswith(".csv"):
         st.error("❌ This algorithm requires a CSV dataset. Please upload a valid .csv file.")
 
-    # === CSV Dataset ===
+    # === CSV Processing ===
     elif uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
         st.subheader("📄 Dataset Preview")
@@ -59,6 +60,7 @@ if uploaded_file is not None and algorithm != "-- Select --":
 
         if st.button("🚀 Run Model"):
             st.subheader("📊 Result")
+
             if algorithm == "KMeans (Clustering)":
                 k = st.slider("Choose number of clusters", 2, 10, 3)
                 model = KMeans(n_clusters=k)
@@ -98,6 +100,31 @@ if uploaded_file is not None and algorithm != "-- Select --":
             elif algorithm == "Simple Neural Network (CSV)":
                 st.warning("⚠️ DL model support coming soon! Currently under development.")
 
-    # === Image ZIP Dataset ===
+    # === Image ZIP for CV ===
     elif uploaded_file.name.endswith(".zip") and category == "CV (Computer Vision)":
         st.warning("⚠️ CV image model support (CNN) is coming soon! Not yet implemented.")
+
+# === Step 5: AI Assistant ===
+st.markdown("---")
+st.subheader("💡 Need Help? Ask the AutoML Assistant")
+
+user_query = st.text_input("🧠 Ask a question about models, dataset, or errors...")
+
+if user_query:
+    with st.spinner("Thinking..."):
+        # Simple AI logic (rule-based)
+        query = user_query.lower()
+        if "target" in query:
+            reply = "A 'target' column is needed for classification models like Random Forest and Logistic Regression."
+        elif "kmeans" in query:
+            reply = "KMeans is unsupervised and doesn't require a target column."
+        elif "csv" in query:
+            reply = "For ML/DL, use a .CSV file with numeric features and optionally a 'target' column."
+        elif "zip" in query or "image" in query:
+            reply = "For CV models, upload a ZIP file of images arranged by folders (one folder per class)."
+        elif "clusters" in query:
+            reply = "Start with 3–5 clusters. You can adjust based on elbow method or visual separation."
+        else:
+            reply = "I'm here to help! Try asking about model types, data formats, or errors."
+
+        st.success(reply)
